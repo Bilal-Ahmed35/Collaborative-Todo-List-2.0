@@ -16,12 +16,20 @@ export function useMongoData(user) {
     console.error(`❌ Error in ${context}:`, error);
 
     let userMessage = "An unexpected error occurred";
-    if (error.message.includes("Access denied")) {
+    if (error.message.includes("Server returned HTML")) {
+      userMessage =
+        "Backend server is not responding correctly. Please check if the server is running.";
+    } else if (error.message.includes("Failed to fetch")) {
+      userMessage =
+        "Cannot connect to server. Please check if the backend is running on http://localhost:5000";
+    } else if (error.message.includes("Access denied")) {
       userMessage = "You don't have permission to access this data";
     } else if (error.message.includes("Network")) {
       userMessage = "Network error. Please check your connection";
     } else if (error.message.includes("not found")) {
       userMessage = "The requested data was not found";
+    } else if (error.message.includes("Invalid Google token")) {
+      userMessage = "Authentication failed. Please try signing in again.";
     }
 
     setError({
@@ -49,14 +57,41 @@ export function useMongoData(user) {
       setLoading(true);
       setError(null);
 
+      // Test connectivity first
+      try {
+        const response = await fetch("http://localhost:5000/health");
+        if (!response.ok) {
+          throw new Error("Server health check failed");
+        }
+        console.log("✅ Backend server is responding");
+      } catch (healthError) {
+        throw new Error(
+          "Backend server is not accessible. Please ensure the server is running on http://localhost:5000"
+        );
+      }
+
       // Connect socket
       socketService.connect(user);
 
-      // Load all data in parallel
-      const [listsData, notificationsData, membersData] = await Promise.all([
-        apiService.getLists(),
-        apiService.getNotifications(),
-        apiService.getUsers(),
+      // Load all data in parallel with timeout
+      const timeout = 10000; // 10 seconds
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error("Request timeout - server took too long to respond")
+            ),
+          timeout
+        )
+      );
+
+      const [listsData, notificationsData, membersData] = await Promise.race([
+        Promise.all([
+          apiService.getLists(),
+          apiService.getNotifications(),
+          apiService.getUsers(),
+        ]),
+        timeoutPromise,
       ]);
 
       console.log("📋 Lists loaded:", listsData.length);
@@ -68,19 +103,23 @@ export function useMongoData(user) {
       setMembers(membersData);
 
       // Load tasks and activities for each list
-      const tasksPromises = listsData.map((list) =>
-        apiService.getTasks(list._id).catch((err) => {
+      const tasksPromises = listsData.map(async (list) => {
+        try {
+          return await apiService.getTasks(list._id);
+        } catch (err) {
           console.error(`Failed to load tasks for list ${list._id}:`, err);
           return [];
-        })
-      );
+        }
+      });
 
-      const activitiesPromises = listsData.map((list) =>
-        apiService.getActivities(list._id).catch((err) => {
+      const activitiesPromises = listsData.map(async (list) => {
+        try {
+          return await apiService.getActivities(list._id);
+        } catch (err) {
           console.error(`Failed to load activities for list ${list._id}:`, err);
           return [];
-        })
-      );
+        }
+      });
 
       const [tasksResults, activitiesResults] = await Promise.all([
         Promise.all(tasksPromises),
@@ -114,15 +153,17 @@ export function useMongoData(user) {
     // Task events
     unsubscribers.push(
       socketService.on("task-created", (data) => {
+        console.log("📝 Task created via socket:", data);
         setTasks((prev) => ({
           ...prev,
-          [data.listId]: [...(prev[data.listId] || []), data.task],
+          [data.listId]: [data.task, ...(prev[data.listId] || [])],
         }));
       })
     );
 
     unsubscribers.push(
       socketService.on("task-updated", (data) => {
+        console.log("✏️ Task updated via socket:", data);
         setTasks((prev) => ({
           ...prev,
           [data.listId]: (prev[data.listId] || []).map((task) =>
@@ -134,6 +175,7 @@ export function useMongoData(user) {
 
     unsubscribers.push(
       socketService.on("task-deleted", (data) => {
+        console.log("🗑️ Task deleted via socket:", data);
         setTasks((prev) => ({
           ...prev,
           [data.listId]: (prev[data.listId] || []).filter(
@@ -146,6 +188,7 @@ export function useMongoData(user) {
     // List events
     unsubscribers.push(
       socketService.on("list-updated", (data) => {
+        console.log("📋 List updated via socket:", data);
         setLists((prev) =>
           prev.map((list) => (list._id === data.list._id ? data.list : list))
         );
@@ -155,6 +198,7 @@ export function useMongoData(user) {
     // Activity events
     unsubscribers.push(
       socketService.on("activity-created", (data) => {
+        console.log("📊 Activity created via socket:", data);
         setActivities((prev) => ({
           ...prev,
           [data.listId]: [data.activity, ...(prev[data.listId] || [])],
@@ -165,6 +209,7 @@ export function useMongoData(user) {
     // Notification events
     unsubscribers.push(
       socketService.on("notification-created", (data) => {
+        console.log("🔔 Notification created via socket:", data);
         if (data.notification.userId === user.uid) {
           setNotifications((prev) => [data.notification, ...prev]);
         }
@@ -187,13 +232,18 @@ export function useMongoData(user) {
     };
   }, [user, loadInitialData]);
 
-  // CRUD operations
+  // CRUD operations with better error handling
   const createList = async (listData) => {
     if (!user) throw new Error("User not authenticated");
 
     try {
       console.log("🆕 Creating list:", listData);
-      const newList = await apiService.createList(listData);
+      const newList = await apiService.createList({
+        ...listData,
+        ownerId: user.uid,
+        memberIds: [user.uid],
+        roles: { [user.uid]: "owner" },
+      });
 
       // Update local state
       setLists((prev) => [newList, ...prev]);
@@ -212,7 +262,11 @@ export function useMongoData(user) {
     if (!user) throw new Error("User not authenticated");
 
     try {
-      const newTask = await apiService.createTask(listId, taskData);
+      console.log("🆕 Creating task in list:", listId);
+      const newTask = await apiService.createTask(listId, {
+        ...taskData,
+        createdBy: user.uid,
+      });
 
       // Update local state (will also be updated via socket)
       setTasks((prev) => ({
@@ -220,6 +274,7 @@ export function useMongoData(user) {
         [listId]: [newTask, ...(prev[listId] || [])],
       }));
 
+      console.log("✅ Task created:", newTask._id);
       return newTask._id;
     } catch (error) {
       handleError(error, "creating task");
@@ -231,6 +286,7 @@ export function useMongoData(user) {
     if (!user) throw new Error("User not authenticated");
 
     try {
+      console.log("✏️ Updating task:", taskId);
       const updatedTask = await apiService.updateTask(listId, taskId, taskData);
 
       // Update local state (will also be updated via socket)
@@ -240,6 +296,8 @@ export function useMongoData(user) {
           task._id === taskId ? updatedTask : task
         ),
       }));
+
+      console.log("✅ Task updated:", taskId);
     } catch (error) {
       handleError(error, "updating task");
       throw error;
@@ -250,6 +308,7 @@ export function useMongoData(user) {
     if (!user) throw new Error("User not authenticated");
 
     try {
+      console.log("🗑️ Deleting task:", taskId);
       await apiService.deleteTask(listId, taskId);
 
       // Update local state (will also be updated via socket)
@@ -257,6 +316,8 @@ export function useMongoData(user) {
         ...prev,
         [listId]: (prev[listId] || []).filter((task) => task._id !== taskId),
       }));
+
+      console.log("✅ Task deleted:", taskId);
     } catch (error) {
       handleError(error, "deleting task");
       throw error;
@@ -267,7 +328,9 @@ export function useMongoData(user) {
     if (!user) throw new Error("User not authenticated");
 
     try {
+      console.log("📧 Inviting member to list:", listId, email);
       await apiService.inviteMember(listId, email, role);
+      console.log("✅ Invitation sent to:", email);
     } catch (error) {
       handleError(error, "inviting member");
       throw error;
@@ -289,6 +352,8 @@ export function useMongoData(user) {
           notif._id === notificationId ? updatedNotification : notif
         )
       );
+
+      console.log("✅ Notification updated:", notificationId);
     } catch (error) {
       handleError(error, "updating notification");
       throw error;
@@ -313,7 +378,7 @@ export function useMongoData(user) {
   const canUserEdit = useCallback(
     (listId) => {
       const role = getUserRole(listId);
-      return role === "owner" || role === "editor";
+      return role === "owner" || role === "admin" || role === "editor";
     },
     [getUserRole]
   );

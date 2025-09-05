@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -7,198 +7,342 @@ import {
   Button,
   CircularProgress,
   Alert,
+  Chip,
 } from "@mui/material";
-import { Google as GoogleIcon } from "@mui/icons-material";
-import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
+import {
+  Google as GoogleIcon,
+  Warning as WarningIcon,
+} from "@mui/icons-material";
+import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import authService from "../services/authService";
-
-// Initialize Google Auth for web
-if (typeof window !== "undefined" && !window.google) {
-  // Load Google Identity Services script
-  const script = document.createElement("script");
-  script.src = "https://accounts.google.com/gsi/client";
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
-}
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [serverStatus, setServerStatus] = useState("checking");
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError("");
+  // Get Google Client ID from environment
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
 
+  // Check server connection on component mount
+  useEffect(() => {
+    checkServerConnection();
+  }, []);
+
+  const checkServerConnection = async () => {
     try {
-      // Initialize Google Auth if not already done
-      if (window.google && window.google.accounts) {
-        // Use Google Identity Services (new method)
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-          scope: "email profile",
-          callback: async (response) => {
-            try {
-              if (response.access_token) {
-                // Get user info using the access token
-                const userInfoResponse = await fetch(
-                  `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${response.access_token}`
-                );
-                const userInfo = await userInfoResponse.json();
-
-                // Create a JWT token with user info
-                const userData = {
-                  uid: userInfo.id,
-                  email: userInfo.email,
-                  displayName: userInfo.name,
-                  photoURL: userInfo.picture,
-                };
-
-                await authService.signInWithGoogle(JSON.stringify(userData));
-              }
-            } catch (error) {
-              console.error("Error processing Google auth response:", error);
-              setError("Authentication failed. Please try again.");
-            } finally {
-              setLoading(false);
-            }
-          },
-        });
-
-        client.requestAccessToken();
+      const response = await fetch("http://localhost:5000/health");
+      if (response.ok) {
+        setServerStatus("connected");
+        setError("");
       } else {
-        // Fallback: prompt user to use their own Google token
-        const googleToken = prompt(
-          "Please paste your Google ID token here:\n\n" +
-            "You can get this from:\n" +
-            "1. Go to https://developers.google.com/oauthplayground\n" +
-            "2. Select Google OAuth2 API v2\n" +
-            "3. Authorize and get the ID token"
-        );
-
-        if (googleToken) {
-          await authService.signInWithGoogle(googleToken);
-        } else {
-          setError("Google authentication token is required");
-        }
+        setServerStatus("disconnected");
+        setError("Backend server is running but not responding correctly");
       }
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error.message || "Authentication failed. Please try again.");
-    } finally {
-      setLoading(false);
+      setServerStatus("disconnected");
+      setError(
+        "Cannot connect to backend server. Please start the server on port 5000"
+      );
     }
   };
 
-  // Alternative simple login for development/demo
-  const handleDemoLogin = async () => {
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (serverStatus !== "connected") {
+      setError("Backend server must be running for authentication");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      // Create a demo user
-      const demoUser = {
-        uid: `demo_${Date.now()}`,
-        email: "demo@example.com",
-        displayName: "Demo User",
-        photoURL: null,
-      };
+      console.log("Google login successful, processing token...");
 
-      // For demo purposes, we'll use the demo user data as the token
-      await authService.signInWithGoogle(JSON.stringify(demoUser));
+      // credentialResponse.credential contains the JWT ID token
+      const googleToken = credentialResponse.credential;
+
+      if (!googleToken) {
+        throw new Error("No token received from Google");
+      }
+
+      await authService.signInWithGoogle(googleToken);
+      console.log("Authentication successful!");
     } catch (error) {
-      console.error("Demo login error:", error);
-      setError("Demo login failed. Please try again.");
+      console.error("Login error:", error);
+      setError("Authentication failed: " + (error.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      }}
-    >
-      <Card sx={{ maxWidth: 400, width: "100%", mx: 2 }}>
-        <CardContent sx={{ textAlign: "center", p: 4 }}>
-          <Typography
-            variant="h4"
-            gutterBottom
-            color="primary"
-            fontWeight="bold"
-          >
-            Collab Todo
-          </Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            Collaborate on tasks with your team in real-time
-          </Typography>
-          <Typography variant="caption" color="text.secondary" paragraph>
-            Now powered by MongoDB for better performance and scalability
-          </Typography>
+  const handleGoogleError = () => {
+    console.error("Google login failed");
+    setError("Google login was cancelled or failed");
+    setLoading(false);
+  };
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+  const getServerStatusChip = () => {
+    switch (serverStatus) {
+      case "checking":
+        return (
+          <Chip
+            icon={<CircularProgress size={16} />}
+            label="Checking server..."
+            size="small"
+          />
+        );
+      case "connected":
+        return <Chip color="success" label="Server Connected" size="small" />;
+      case "disconnected":
+        return (
+          <Chip
+            color="error"
+            icon={<WarningIcon />}
+            label="Server Disconnected"
+            size="small"
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            startIcon={
-              loading ? <CircularProgress size={20} /> : <GoogleIcon />
-            }
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            sx={{ mt: 2, py: 1.5 }}
-          >
-            {loading ? "Signing in..." : "Continue with Google"}
-          </Button>
+  // If Google Client ID is not configured
+  if (!googleClientId) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <Card sx={{ maxWidth: 600, width: "100%", mx: 2 }}>
+          <CardContent sx={{ textAlign: "center", p: 4 }}>
+            <Typography
+              variant="h4"
+              gutterBottom
+              color="primary"
+              fontWeight="bold"
+            >
+              Collab Todo
+            </Typography>
 
-          {/* Demo login for development */}
-          {process.env.NODE_ENV === "development" && (
-            <>
-              <Typography variant="body2" sx={{ my: 2 }}>
-                or
+            <Alert severity="error" sx={{ mt: 2, textAlign: "left" }}>
+              <Typography variant="h6" gutterBottom>
+                Google OAuth Configuration Required
               </Typography>
+
+              <Typography variant="body2" paragraph>
+                To use this application, you need to set up Google OAuth:
+              </Typography>
+
+              <Typography variant="body2" component="div">
+                <strong>Step 1:</strong> Install the Google OAuth package:
+                <br />
+                <code
+                  style={{
+                    backgroundColor: "rgba(0,0,0,0.1)",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  npm install @react-oauth/google
+                </code>
+              </Typography>
+
+              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                <strong>Step 2:</strong> Get a Google Client ID:
+                <br />
+                1. Go to{" "}
+                <a
+                  href="https://console.cloud.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "inherit" }}
+                >
+                  Google Cloud Console
+                </a>
+                <br />
+                2. Create a new project or select existing
+                <br />
+                3. Enable Google+ API
+                <br />
+                4. Create OAuth 2.0 credentials
+                <br />
+                5. Add http://localhost:3000 to authorized origins
+              </Typography>
+
+              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                <strong>Step 3:</strong> Add to your frontend .env file:
+                <br />
+                <code
+                  style={{
+                    backgroundColor: "rgba(0,0,0,0.1)",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  REACT_APP_GOOGLE_CLIENT_ID=your_client_id_here
+                </code>
+              </Typography>
+
+              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                <strong>Step 4:</strong> Add to your backend .env file:
+                <br />
+                <code
+                  style={{
+                    backgroundColor: "rgba(0,0,0,0.1)",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  GOOGLE_CLIENT_ID=your_client_id_here
+                  <br />
+                  GOOGLE_CLIENT_SECRET=your_client_secret_here
+                </code>
+              </Typography>
+
+              <Typography variant="body2" sx={{ mt: 2 }}>
+                <strong>Step 5:</strong> Restart both frontend and backend
+                servers
+              </Typography>
+            </Alert>
+
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              After setup, refresh this page to see the login interface
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+    );
+  }
+
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <Card sx={{ maxWidth: 500, width: "100%", mx: 2 }}>
+          <CardContent sx={{ textAlign: "center", p: 4 }}>
+            <Typography
+              variant="h4"
+              gutterBottom
+              color="primary"
+              fontWeight="bold"
+            >
+              Collab Todo
+            </Typography>
+
+            <Typography variant="body1" color="text.secondary" paragraph>
+              Collaborate on tasks with your team in real-time
+            </Typography>
+
+            <Typography variant="caption" color="text.secondary" paragraph>
+              Powered by MongoDB Atlas for better performance and scalability
+            </Typography>
+
+            {/* Server status indicator */}
+            <Box sx={{ mb: 3 }}>{getServerStatusChip()}</Box>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
+                <Typography variant="body2">{error}</Typography>
+                {serverStatus === "disconnected" && (
+                  <>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", mt: 1 }}
+                    >
+                      To start the backend server:
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      component="code"
+                      sx={{
+                        display: "block",
+                        mt: 0.5,
+                        fontFamily: "monospace",
+                        backgroundColor: "rgba(0,0,0,0.1)",
+                        p: 0.5,
+                        borderRadius: 1,
+                      }}
+                    >
+                      cd backend && npm run server
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={checkServerConnection}
+                      sx={{ mt: 1 }}
+                    >
+                      Check Again
+                    </Button>
+                  </>
+                )}
+              </Alert>
+            )}
+
+            {/* Google Sign In */}
+            {loading ? (
               <Button
                 fullWidth
-                variant="outlined"
+                variant="contained"
                 size="large"
-                onClick={handleDemoLogin}
-                disabled={loading}
-                sx={{ py: 1.5 }}
+                disabled
+                startIcon={<CircularProgress size={20} color="inherit" />}
+                sx={{ mt: 2, py: 1.5 }}
               >
-                Demo Login (Development)
+                Signing in...
               </Button>
-            </>
-          )}
+            ) : (
+              <Box sx={{ mt: 2 }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  disabled={serverStatus === "disconnected"}
+                  size="large"
+                  width="100%"
+                  text="signin_with"
+                />
+              </Box>
+            )}
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mt: 2, display: "block" }}
-          >
-            By signing in, you agree to our terms and privacy policy
-          </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 3, display: "block" }}
+            >
+              By signing in, you agree to our terms and privacy policy
+            </Typography>
 
-          {/* Instructions for Google setup */}
-          {!process.env.REACT_APP_GOOGLE_CLIENT_ID && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              <Typography variant="caption">
-                To enable Google authentication, set REACT_APP_GOOGLE_CLIENT_ID
-                in your .env file
+            {/* Development Instructions */}
+            <Alert severity="info" sx={{ mt: 3, textAlign: "left" }}>
+              <Typography variant="body2" fontWeight="bold" gutterBottom>
+                Development Setup:
+              </Typography>
+              <Typography variant="body2" component="div">
+                1. Start backend: <code>cd backend && npm run server</code>
+                <br />
+                2. Start frontend: <code>cd frontend && npm start</code>
+                <br />
+                3. Sign in with your Google account
               </Typography>
             </Alert>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
+          </CardContent>
+        </Card>
+      </Box>
+    </GoogleOAuthProvider>
   );
 }

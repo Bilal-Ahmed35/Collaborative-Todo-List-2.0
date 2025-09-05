@@ -1,4 +1,4 @@
-// Authentication service for MongoDB backend
+// src/services/authService.js
 import apiService from "./apiService";
 
 class AuthService {
@@ -9,7 +9,7 @@ class AuthService {
   }
 
   initializeAuth() {
-    // Check for stored token on app start
+    // Check for stored token & user on app start
     const token = localStorage.getItem("authToken");
     const userData = localStorage.getItem("userData");
 
@@ -17,7 +17,7 @@ class AuthService {
       try {
         this.user = JSON.parse(userData);
         apiService.setToken(token);
-        console.log("🔐 User restored from localStorage:", this.user.email);
+        console.log("User restored from localStorage:", this.user.email);
       } catch (error) {
         console.error("Error parsing stored user data:", error);
         this.signOut();
@@ -53,29 +53,36 @@ class AuthService {
 
   async signInWithGoogle(googleToken) {
     try {
-      console.log("🔐 Authenticating with Google...");
+      console.log("Authenticating with Google...");
+
       const response = await apiService.authenticateWithGoogle(googleToken);
 
-      this.user = response.user;
+      if (response.token) {
+        // Save JWT to localStorage + ApiService
+        localStorage.setItem("authToken", response.token);
+        apiService.setToken(response.token);
+      }
 
-      // Store user data in localStorage
-      localStorage.setItem("userData", JSON.stringify(this.user));
+      if (response.user) {
+        this.user = response.user;
+        localStorage.setItem("userData", JSON.stringify(this.user));
+      }
 
-      console.log("✅ Google authentication successful:", this.user.email);
+      console.log("Google authentication successful:", this.user?.email);
 
       // Notify listeners
       this.notifyAuthListeners();
 
       return this.user;
     } catch (error) {
-      console.error("❌ Google authentication failed:", error);
+      console.error("Google authentication failed:", error);
       throw error;
     }
   }
 
   async signOut() {
     try {
-      console.log("🔐 Signing out...");
+      console.log("Signing out...");
 
       // Clear API service token
       await apiService.signOut();
@@ -87,14 +94,16 @@ class AuthService {
       // Clear user state
       this.user = null;
 
-      console.log("✅ Sign out successful");
+      console.log("Sign out successful");
 
       // Notify listeners
       this.notifyAuthListeners();
     } catch (error) {
-      console.error("❌ Sign out error:", error);
+      console.error("Sign out error:", error);
       // Still clear local state even if API call fails
       this.user = null;
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("userData");
       this.notifyAuthListeners();
       throw error;
     }
@@ -113,4 +122,5 @@ class AuthService {
   }
 }
 
-export default new AuthService();
+const authService = new AuthService();
+export default authService;

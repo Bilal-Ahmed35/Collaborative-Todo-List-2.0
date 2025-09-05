@@ -38,11 +38,24 @@ class ApiService {
     try {
       const response = await fetch(url, config);
 
-      if (!response.ok) {
-        const error = await response.json();
+      // Check if response is HTML (likely a 404 page)
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
         throw new Error(
-          error.error || `HTTP error! status: ${response.status}`
+          `Server returned HTML instead of JSON. Check if the endpoint ${endpoint} exists on the backend.`
         );
+      }
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.message || errorMessage;
+        } catch (jsonError) {
+          // If we can't parse the error as JSON, use the status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       // Handle no content responses
@@ -52,6 +65,22 @@ class ApiService {
 
       return await response.json();
     } catch (error) {
+      // Enhance error messages for common connection issues
+      if (
+        error.name === "TypeError" &&
+        error.message.includes("Failed to fetch")
+      ) {
+        throw new Error(
+          "Cannot connect to backend server. Please ensure the server is running on http://localhost:5000"
+        );
+      }
+
+      if (error.message.includes("ERR_CONNECTION_REFUSED")) {
+        throw new Error(
+          "Connection refused. Backend server is not running on port 5000."
+        );
+      }
+
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
@@ -59,6 +88,19 @@ class ApiService {
 
   // Auth methods
   async authenticateWithGoogle(googleToken) {
+    // Validate token format
+    if (!googleToken || typeof googleToken !== "string") {
+      throw new Error("Invalid Google token: Token must be a string");
+    }
+
+    // Check if it's a proper JWT (should have 3 segments)
+    const segments = googleToken.split(".");
+    if (segments.length !== 3) {
+      throw new Error(
+        `Invalid Google token format: Expected JWT with 3 segments, got ${segments.length}`
+      );
+    }
+
     const response = await this.request("/auth/google", {
       method: "POST",
       body: JSON.stringify({ token: googleToken }),
@@ -108,32 +150,36 @@ class ApiService {
 
   // Task methods
   async getTasks(listId) {
-    return this.request(`/lists/${listId}/tasks`);
+    return this.request("/tasks").then((tasks) =>
+      tasks.filter((task) => task.listId === listId)
+    );
   }
 
   async createTask(listId, taskData) {
-    return this.request(`/lists/${listId}/tasks`, {
+    return this.request("/tasks", {
       method: "POST",
-      body: JSON.stringify(taskData),
+      body: JSON.stringify({ ...taskData, listId }),
     });
   }
 
   async updateTask(listId, taskId, taskData) {
-    return this.request(`/lists/${listId}/tasks/${taskId}`, {
+    return this.request(`/tasks/${taskId}`, {
       method: "PUT",
       body: JSON.stringify(taskData),
     });
   }
 
   async deleteTask(listId, taskId) {
-    return this.request(`/lists/${listId}/tasks/${taskId}`, {
+    return this.request(`/tasks/${taskId}`, {
       method: "DELETE",
     });
   }
 
   // Activity methods
   async getActivities(listId) {
-    return this.request(`/lists/${listId}/activities`);
+    return this.request("/activities").then((activities) =>
+      activities.filter((activity) => activity.listId === listId)
+    );
   }
 
   // Notification methods
@@ -150,9 +196,9 @@ class ApiService {
 
   // Invitation methods
   async inviteMember(listId, email, role) {
-    return this.request(`/lists/${listId}/invitations`, {
+    return this.request("/invitations", {
       method: "POST",
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ email, role, listId }),
     });
   }
 
@@ -162,4 +208,5 @@ class ApiService {
   }
 }
 
-export default new ApiService();
+const apiService = new ApiService();
+export default apiService;
