@@ -41,34 +41,26 @@ const connectDB = async () => {
       {
         useNewUrlParser: true,
         useUnifiedTopology: true,
-        serverSelectionTimeoutMS: 30000, // Increased from 10000
+        serverSelectionTimeoutMS: 30000,
         socketTimeoutMS: 45000,
-        bufferMaxEntries: 0, // Disable mongoose buffering - this fixes the timeout issue
-        maxPoolSize: 10, // Maximum number of connections
-        minPoolSize: 2, // Minimum number of connections
-        maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
-        connectTimeoutMS: 30000, // Give up initial connection after 30 seconds
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        maxIdleTimeMS: 30000,
+        connectTimeoutMS: 30000,
       }
     );
     console.log("MongoDB connected successfully");
   } catch (err) {
     console.error("MongoDB connection error:", err.message);
-
-    // In production, exit the process if database connection fails
     if (process.env.NODE_ENV === "production") {
-      console.error("Database connection required in production. Exiting...");
       process.exit(1);
     } else {
-      console.log("Server will continue without database in development mode");
-      console.log("Some features may not work properly");
+      console.log("⚠️ Continuing in dev mode without DB");
     }
   }
 };
 
-// Connect to database
-connectDB();
-
-// Handle MongoDB connection events
+// MongoDB events
 mongoose.connection.on("disconnected", () => {
   console.log("MongoDB disconnected");
 });
@@ -104,36 +96,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// Routes
-app.use("/api/auth", authRoutes);
-
-// Protected routes (require authentication)
-app.use("/api/users", authenticateToken, userRoutes);
-app.use("/api/lists", authenticateToken, listRoutes);
-app.use("/api/tasks", authenticateToken, taskRoutes);
-app.use("/api/activities", authenticateToken, activityRoutes);
-app.use("/api/notifications", authenticateToken, notificationRoutes);
-app.use("/api/invitations", authenticateToken, invitationRoutes);
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error("Unhandled error:", error);
-
-  const isDevelopment = process.env.NODE_ENV !== "production";
-
-  res.status(error.status || 500).json({
-    error: isDevelopment ? error.message : "Internal server error",
-    ...(isDevelopment && { stack: error.stack }),
-  });
-});
-
-// 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({
-    error: `Route ${req.method} ${req.originalUrl} not found`,
-  });
-});
-
 // Socket.IO setup
 const http = require("http");
 const socketIo = require("socket.io");
@@ -151,7 +113,6 @@ io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
   }
 
-  // Handle user joining their personal room
   socket.on("join-user", (userId) => {
     if (userId && typeof userId === "string") {
       socket.join(`user:${userId}`);
@@ -161,7 +122,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle joining list rooms
   socket.on("join-list", (listId) => {
     if (listId && typeof listId === "string") {
       socket.join(`list:${listId}`);
@@ -171,7 +131,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle leaving list rooms
   socket.on("leave-list", (listId) => {
     if (listId && typeof listId === "string") {
       socket.leave(`list:${listId}`);
@@ -208,7 +167,6 @@ const gracefulShutdown = (signal) => {
     });
   });
 
-  // Force shutdown after 10 seconds
   setTimeout(() => {
     console.error(
       "Could not close connections in time, forcefully shutting down"
@@ -219,13 +177,10 @@ const gracefulShutdown = (signal) => {
 
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-
-// Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
   gracefulShutdown("UNCAUGHT_EXCEPTION");
 });
-
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled Rejection:", err);
   gracefulShutdown("UNHANDLED_REJECTION");
@@ -233,14 +188,43 @@ process.on("unhandledRejection", (err) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(
-    `CORS origin: ${process.env.CLIENT_URL || "http://localhost:3000"}`
-  );
+// Connect DB first, then start server
+connectDB().then(() => {
+  // Register routes AFTER DB connection
+  app.use("/api/auth", authRoutes);
+  app.use("/api/users", authenticateToken, userRoutes);
+  app.use("/api/lists", authenticateToken, listRoutes);
+  app.use("/api/tasks", authenticateToken, taskRoutes);
+  app.use("/api/activities", authenticateToken, activityRoutes);
+  app.use("/api/notifications", authenticateToken, notificationRoutes);
+  app.use("/api/invitations", authenticateToken, invitationRoutes);
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`Health check: http://localhost:${PORT}/health`);
-  }
+  // Error handling middleware
+  app.use((error, req, res, next) => {
+    console.error("Unhandled error:", error);
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    res.status(error.status || 500).json({
+      error: isDevelopment ? error.message : "Internal server error",
+      ...(isDevelopment && { stack: error.stack }),
+    });
+  });
+
+  // 404 handler
+  app.use("*", (req, res) => {
+    res.status(404).json({
+      error: `Route ${req.method} ${req.originalUrl} not found`,
+    });
+  });
+
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(
+      `CORS origin: ${process.env.CLIENT_URL || "http://localhost:3000"}`
+    );
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`Health check: http://localhost:${PORT}/health`);
+    }
+  });
 });

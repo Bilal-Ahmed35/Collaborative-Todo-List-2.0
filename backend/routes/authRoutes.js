@@ -55,6 +55,14 @@ router.use(authRateLimit);
 // MongoDB connection checker middleware
 const checkDatabaseConnection = async (req, res, next) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        error: "Database not connected",
+        code: "DATABASE_NOT_CONNECTED",
+        retry: true,
+      });
+    }
+
     await mongoose.connection.db.admin().ping();
     next();
   } catch (error) {
