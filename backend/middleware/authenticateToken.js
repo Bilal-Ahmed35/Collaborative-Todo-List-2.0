@@ -23,9 +23,28 @@ const authenticateToken = async (req, res, next) => {
 
     console.log("🔍 Authenticating token, length:", token.length);
 
+    // Validate JWT_SECRET exists
+    if (!process.env.JWT_SECRET) {
+      console.error("❌ JWT_SECRET not configured");
+      return res.status(500).json({
+        error: "Authentication service configuration error",
+        code: "AUTH_CONFIG_ERROR",
+      });
+    }
+
     // Try JWT verification first (this is your primary auth method)
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        // Add verification options for better security
+        issuer: "collab-todo-api",
+        audience: "collab-todo-client",
+      });
+
+      // Validate required fields
+      if (!decoded.uid || !decoded.email) {
+        throw new Error("Invalid token payload - missing required fields");
+      }
+
       req.user = {
         uid: decoded.uid,
         email: decoded.email,
@@ -37,8 +56,13 @@ const authenticateToken = async (req, res, next) => {
     } catch (jwtError) {
       console.log("⚠️ JWT verification failed:", jwtError.message);
 
-      // If JWT fails, try direct Google token verification as fallback
-      if (googleClient) {
+      // Only try Google token verification if the token looks like a Google JWT
+      // Google JWTs typically have specific characteristics
+      if (
+        googleClient &&
+        token.includes(".") &&
+        token.split(".").length === 3
+      ) {
         try {
           console.log("🔍 Attempting Google token verification as fallback");
           const ticket = await googleClient.verifyIdToken({
@@ -71,11 +95,27 @@ const authenticateToken = async (req, res, next) => {
         }
       }
 
-      // Both methods failed
-      console.error("❌ All token verification methods failed");
+      // Both methods failed - determine the error type
+      let errorMessage = "Invalid or expired token";
+      let errorCode = "INVALID_TOKEN";
+
+      if (jwtError.name === "TokenExpiredError") {
+        errorMessage = "Token has expired";
+        errorCode = "TOKEN_EXPIRED";
+      } else if (jwtError.name === "JsonWebTokenError") {
+        if (jwtError.message.includes("invalid signature")) {
+          errorMessage = "Invalid token signature";
+          errorCode = "INVALID_SIGNATURE";
+        } else if (jwtError.message.includes("malformed")) {
+          errorMessage = "Malformed token";
+          errorCode = "MALFORMED_TOKEN";
+        }
+      }
+
+      console.error("❌ All token verification methods failed:", errorMessage);
       return res.status(403).json({
-        error: "Invalid or expired token",
-        code: "INVALID_TOKEN",
+        error: errorMessage,
+        code: errorCode,
         details:
           process.env.NODE_ENV === "development" ? jwtError.message : undefined,
       });

@@ -1,4 +1,4 @@
-// API service for communicating with MongoDB backend
+// src/services/apiService.js
 const API_BASE_URL = process.env.REACT_APP_API_URL || "/api";
 
 class ApiService {
@@ -47,14 +47,35 @@ class ApiService {
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
+        let errorCode = "HTTP_ERROR";
+
         try {
           const error = await response.json();
           errorMessage = error.error || error.message || errorMessage;
+          errorCode = error.code || errorCode;
+
+          // Handle specific authentication errors
+          if (response.status === 401) {
+            errorCode = "UNAUTHORIZED";
+            errorMessage = "Authentication required";
+            // Clear invalid token
+            this.setToken(null);
+          } else if (response.status === 403) {
+            errorCode = "FORBIDDEN";
+            errorMessage =
+              error.error || "Access denied - invalid or expired token";
+            // Clear invalid token
+            this.setToken(null);
+          }
         } catch (jsonError) {
           // If we can't parse the error as JSON, use the status text
           errorMessage = response.statusText || errorMessage;
         }
-        throw new Error(errorMessage);
+
+        const apiError = new Error(errorMessage);
+        apiError.status = response.status;
+        apiError.code = errorCode;
+        throw apiError;
       }
 
       // Handle no content responses
@@ -69,15 +90,27 @@ class ApiService {
         error.name === "TypeError" &&
         error.message.includes("Failed to fetch")
       ) {
-        throw new Error(
+        const enhancedError = new Error(
           "Cannot connect to backend server. Please ensure the server is running on http://localhost:5000"
         );
+        enhancedError.code = "CONNECTION_FAILED";
+        throw enhancedError;
       }
 
       if (error.message.includes("ERR_CONNECTION_REFUSED")) {
-        throw new Error(
+        const enhancedError = new Error(
           "Connection refused. Backend server is not running on port 5000."
         );
+        enhancedError.code = "CONNECTION_REFUSED";
+        throw enhancedError;
+      }
+
+      // If token was cleared due to auth error, notify about re-authentication
+      if (error.status === 401 || error.status === 403) {
+        const authError = new Error("Please sign in again");
+        authError.code = "REAUTHENTICATION_REQUIRED";
+        authError.originalError = error;
+        throw authError;
       }
 
       console.error(`API request failed: ${endpoint}`, error);
@@ -100,16 +133,22 @@ class ApiService {
       );
     }
 
-    const response = await this.request("/auth/google", {
-      method: "POST",
-      body: JSON.stringify({ token: googleToken }),
-    });
+    try {
+      const response = await this.request("/auth/google", {
+        method: "POST",
+        body: JSON.stringify({ token: googleToken }),
+      });
 
-    if (response.token) {
-      this.setToken(response.token);
+      if (response.token) {
+        this.setToken(response.token);
+      }
+
+      return response;
+    } catch (error) {
+      // Don't set token if authentication failed
+      this.setToken(null);
+      throw error;
     }
-
-    return response;
   }
 
   async signOut() {

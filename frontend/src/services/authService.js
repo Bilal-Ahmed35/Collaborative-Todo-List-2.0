@@ -15,14 +15,49 @@ class AuthService {
 
     if (token && userData) {
       try {
-        this.user = JSON.parse(userData);
-        apiService.setToken(token);
-        console.log("User restored from localStorage:", this.user.email);
+        const parsedUser = JSON.parse(userData);
+
+        // Validate the token is not expired
+        if (this.isTokenValid(token)) {
+          this.user = parsedUser;
+          apiService.setToken(token);
+          console.log("User restored from localStorage:", this.user.email);
+        } else {
+          console.log("Stored token is expired, clearing auth state");
+          this.clearAuthState();
+        }
       } catch (error) {
         console.error("Error parsing stored user data:", error);
-        this.signOut();
+        this.clearAuthState();
       }
     }
+  }
+
+  // Check if JWT token is still valid (not expired)
+  isTokenValid(token) {
+    try {
+      if (!token) return false;
+
+      const parts = token.split(".");
+      if (parts.length !== 3) return false;
+
+      const payload = JSON.parse(atob(parts[1]));
+      const currentTime = Date.now() / 1000;
+
+      // Check if token is expired (with 5 minute buffer)
+      return payload.exp && payload.exp > currentTime + 300;
+    } catch (error) {
+      console.error("Error validating token:", error);
+      return false;
+    }
+  }
+
+  // Clear authentication state
+  clearAuthState() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    this.user = null;
+    apiService.setToken(null);
   }
 
   // Subscribe to auth state changes
@@ -55,27 +90,38 @@ class AuthService {
     try {
       console.log("Authenticating with Google...");
 
+      // Validate the Google token format
+      if (!googleToken || typeof googleToken !== "string") {
+        throw new Error("Invalid Google token provided");
+      }
+
       const response = await apiService.authenticateWithGoogle(googleToken);
 
-      if (response.token) {
-        // Save JWT to localStorage + ApiService
+      if (response.token && response.user) {
+        // Save JWT token
         localStorage.setItem("authToken", response.token);
         apiService.setToken(response.token);
-      }
 
-      if (response.user) {
+        // Save user data
         this.user = response.user;
         localStorage.setItem("userData", JSON.stringify(this.user));
+
+        console.log("Google authentication successful:", this.user?.email);
+
+        // Notify listeners
+        this.notifyAuthListeners();
+
+        return this.user;
+      } else {
+        throw new Error("Authentication response missing token or user data");
       }
-
-      console.log("Google authentication successful:", this.user?.email);
-
-      // Notify listeners
-      this.notifyAuthListeners();
-
-      return this.user;
     } catch (error) {
       console.error("Google authentication failed:", error);
+
+      // Clear any partial auth state
+      this.clearAuthState();
+      this.notifyAuthListeners();
+
       throw error;
     }
   }
@@ -87,12 +133,8 @@ class AuthService {
       // Clear API service token
       await apiService.signOut();
 
-      // Clear local storage
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("userData");
-
-      // Clear user state
-      this.user = null;
+      // Clear all auth state
+      this.clearAuthState();
 
       console.log("Sign out successful");
 
@@ -101,9 +143,7 @@ class AuthService {
     } catch (error) {
       console.error("Sign out error:", error);
       // Still clear local state even if API call fails
-      this.user = null;
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("userData");
+      this.clearAuthState();
       this.notifyAuthListeners();
       throw error;
     }
@@ -114,11 +154,13 @@ class AuthService {
   }
 
   isAuthenticated() {
-    return !!this.user;
+    const token = localStorage.getItem("authToken");
+    return !!this.user && !!token && this.isTokenValid(token);
   }
 
   getAuthToken() {
-    return localStorage.getItem("authToken");
+    const token = localStorage.getItem("authToken");
+    return this.isTokenValid(token) ? token : null;
   }
 }
 
