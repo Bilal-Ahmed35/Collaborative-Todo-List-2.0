@@ -154,6 +154,32 @@ io.on("connection", (socket) => {
 // Make io accessible to routes
 app.set("io", io);
 
+// Register routes BEFORE attempting DB connection
+app.use("/api/auth", authRoutes);
+app.use("/api/users", authenticateToken, userRoutes);
+app.use("/api/lists", authenticateToken, listRoutes);
+app.use("/api/tasks", authenticateToken, taskRoutes);
+app.use("/api/activities", authenticateToken, activityRoutes);
+app.use("/api/notifications", authenticateToken, notificationRoutes);
+app.use("/api/invitations", authenticateToken, invitationRoutes);
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error("Unhandled error:", error);
+  const isDevelopment = process.env.NODE_ENV !== "production";
+  res.status(error.status || 500).json({
+    error: isDevelopment ? error.message : "Internal server error",
+    ...(isDevelopment && { stack: error.stack }),
+  });
+});
+
+// 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({
+    error: `Route ${req.method} ${req.originalUrl} not found`,
+  });
+});
+
 // Graceful shutdown
 const gracefulShutdown = (signal) => {
   console.log(`Received ${signal}. Shutting down gracefully...`);
@@ -190,32 +216,6 @@ const PORT = process.env.PORT || 5000;
 
 // Connect DB first, then start server
 connectDB().then(() => {
-  // Register routes AFTER DB connection
-  app.use("/api/auth", authRoutes);
-  app.use("/api/users", authenticateToken, userRoutes);
-  app.use("/api/lists", authenticateToken, listRoutes);
-  app.use("/api/tasks", authenticateToken, taskRoutes);
-  app.use("/api/activities", authenticateToken, activityRoutes);
-  app.use("/api/notifications", authenticateToken, notificationRoutes);
-  app.use("/api/invitations", authenticateToken, invitationRoutes);
-
-  // Error handling middleware
-  app.use((error, req, res, next) => {
-    console.error("Unhandled error:", error);
-    const isDevelopment = process.env.NODE_ENV !== "production";
-    res.status(error.status || 500).json({
-      error: isDevelopment ? error.message : "Internal server error",
-      ...(isDevelopment && { stack: error.stack }),
-    });
-  });
-
-  // 404 handler
-  app.use("*", (req, res) => {
-    res.status(404).json({
-      error: `Route ${req.method} ${req.originalUrl} not found`,
-    });
-  });
-
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);

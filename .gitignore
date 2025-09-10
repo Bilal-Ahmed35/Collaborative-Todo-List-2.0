@@ -1,17 +1,17 @@
 # Environment variables
-.env
+# .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # Frontend specific
-frontend/.env*
+# frontend/.env*
 frontend/node_modules/
 frontend/dist/
 frontend/build/
 
 # Backend specific
-backend/.env*
+# backend/.env*
 backend/node_modules/
 backend/logs/

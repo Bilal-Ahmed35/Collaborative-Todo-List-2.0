@@ -40,6 +40,7 @@ export function useMongoData(user) {
   }, []);
 
   // Load initial data
+
   const loadInitialData = useCallback(async () => {
     if (!user) {
       setLists([]);
@@ -52,8 +53,24 @@ export function useMongoData(user) {
       return;
     }
 
+    // Add token check before making requests
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      console.log("No auth token available, waiting for authentication...");
+      setLoading(false);
+      setError({
+        message: "Authentication required",
+        userMessage: "Please sign in again",
+        context: "missing auth token",
+      });
+      return;
+    }
+
+    // Ensure apiService has the token
+    apiService.setToken(token);
+
     try {
-      console.log("🔍 Loading initial data for user:", user.uid);
+      console.log("Loading initial data for user:", user.uid);
       setLoading(true);
       setError(null);
 
@@ -63,7 +80,7 @@ export function useMongoData(user) {
         if (!response.ok) {
           throw new Error("Server health check failed");
         }
-        console.log("✅ Backend server is responding");
+        console.log("Backend server is responding");
       } catch (healthError) {
         throw new Error(
           "Backend server is not accessible. Please ensure the server is running on http://localhost:5000"
@@ -94,9 +111,9 @@ export function useMongoData(user) {
         timeoutPromise,
       ]);
 
-      console.log("📋 Lists loaded:", listsData.length);
-      console.log("🔔 Notifications loaded:", notificationsData.length);
-      console.log("👥 Members loaded:", membersData.length);
+      console.log("Lists loaded:", listsData.length);
+      console.log("Notifications loaded:", notificationsData.length);
+      console.log("Members loaded:", membersData.length);
 
       setLists(listsData);
       setNotifications(notificationsData);
