@@ -12,6 +12,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Tooltip,
 } from "@mui/material";
 import apiService from "../services/apiService";
 
@@ -170,7 +171,7 @@ export default function InvitationHandler({
       // when they authenticate and have pending invitations
 
       showSnackbar(
-        `Welcome to "${inviteData.listName}"! You now have ${inviteData.role} access.`,
+        `Welcome to "${inviteData.list}"! You now have ${inviteData.role} access.`,
         "success"
       );
 
@@ -252,6 +253,29 @@ export default function InvitationHandler({
     }
   }, [processing, mounted, clearUrlParams]);
 
+  // Wrapper component for disabled buttons in tooltips
+  const TooltipButton = ({ tooltip, disabled, children, ...buttonProps }) => {
+    const button = (
+      <Button {...buttonProps} disabled={disabled}>
+        {children}
+      </Button>
+    );
+
+    if (tooltip && disabled) {
+      return (
+        <Tooltip title={tooltip}>
+          <span>{button}</span>
+        </Tooltip>
+      );
+    }
+
+    if (tooltip) {
+      return <Tooltip title={tooltip}>{button}</Tooltip>;
+    }
+
+    return button;
+  };
+
   if (loading) {
     return (
       <Dialog open={true} maxWidth="sm" fullWidth disableEscapeKeyDown>
@@ -287,7 +311,7 @@ export default function InvitationHandler({
             <Card sx={{ mb: 2 }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  {inviteData.listName}
+                  {inviteData.list}
                 </Typography>
                 <Box
                   sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}
@@ -324,17 +348,21 @@ export default function InvitationHandler({
             )}
           </DialogContent>
           <DialogActions>
-            <Button
+            <TooltipButton
               onClick={declineInvitation}
               disabled={processing}
               color="inherit"
+              tooltip={processing ? "Please wait while processing..." : null}
             >
               {processing ? "Processing..." : "Decline"}
-            </Button>
-            <Button
+            </TooltipButton>
+            <TooltipButton
               onClick={acceptInvitation}
               variant="contained"
               disabled={processing}
+              tooltip={
+                processing ? "Please wait while joining the list..." : null
+              }
             >
               {processing ? (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -344,7 +372,7 @@ export default function InvitationHandler({
               ) : (
                 "Accept & Join"
               )}
-            </Button>
+            </TooltipButton>
           </DialogActions>
         </>
       )}

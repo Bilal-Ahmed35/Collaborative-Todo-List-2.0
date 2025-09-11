@@ -160,7 +160,7 @@ router.post("/:id/invitations", async (req, res) => {
     const invitation = new PendingInvitation({
       email: email.toLowerCase(),
       listId: listId,
-      listName: list.name,
+      list: list.name,
       role: role || "viewer",
     });
 

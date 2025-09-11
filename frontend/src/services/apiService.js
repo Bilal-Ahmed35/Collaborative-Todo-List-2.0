@@ -234,9 +234,9 @@ class ApiService {
 
   // Invitation methods
   async inviteMember(listId, email, role) {
-    return this.request("/invitations", {
+    return this.request(`/lists/${listId}/invitations`, {
       method: "POST",
-      body: JSON.stringify({ email, role, listId }),
+      body: JSON.stringify({ email, role }),
     });
   }
 

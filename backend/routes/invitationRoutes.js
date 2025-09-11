@@ -30,7 +30,7 @@ router.post("/send-email", async (req, res) => {
   try {
     const {
       email,
-      listName,
+      list,
       invitedByName,
       role,
       listId,
@@ -39,7 +39,7 @@ router.post("/send-email", async (req, res) => {
     } = req.body;
 
     // Basic validation
-    if (!email || !listName || !invitedByName) {
+    if (!email || !list || !invitedByName) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -48,12 +48,12 @@ router.post("/send-email", async (req, res) => {
 
     // For now, just return success without actually sending email
     // This prevents the error while you set up email service
-    console.log("Email would be sent to:", email, "for list:", listName);
+    console.log("Email would be sent to:", email, "for list:", list);
 
     res.json({
       success: true,
       message: "Email sending simulated (not actually sent)",
-      data: { email, listName, role },
+      data: { email, list, role },
     });
 
     // TODO: Add actual email sending when ready

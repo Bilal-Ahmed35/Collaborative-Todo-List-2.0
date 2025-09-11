@@ -1,21 +1,75 @@
-// services/emailService.js
+// Updated frontend/src/services/emailService.js
 
 /**
  * Check if email service is available and configured
  * @returns {boolean} True if email service is available
  */
 export const isEmailServiceAvailable = () => {
-  // Check if we have email service configuration
-  // You can add your email service API key checks here
-  const hasEmailConfig = !!(
-    process.env.REACT_APP_EMAIL_API_KEY ||
-    process.env.REACT_APP_EMAILJS_SERVICE_ID ||
-    process.env.REACT_APP_SMTP_CONFIG
-  );
+  // Check backend email service availability
+  // You can also add frontend EmailJS checks here
+  return true; // Assume backend email service is available
+};
 
-  // For development, you might want to return false to test link sharing
-  // For production, return true only if properly configured
-  return hasEmailConfig || process.env.NODE_ENV === "development";
+/**
+ * Send email through backend API
+ * @param {Object} emailContent - Email content
+ * @returns {Promise<Object>} Backend API result
+ */
+const sendWithBackendAPI = async (emailContent) => {
+  const response = await fetch("/api/email/send-invitation", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`, // Fixed token key
+    },
+    body: JSON.stringify(emailContent),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || error.message || "Failed to send email");
+  }
+
+  const result = await response.json();
+  return { success: true, service: "backend", result };
+};
+
+/**
+ * Send invitation email
+ * @param {Object} invitationData - Invitation details
+ * @returns {Promise<Object>} Email sending result
+ */
+export const sendInvitationEmail = async (invitationData) => {
+  try {
+    const invitationLink = generateInvitationLink(invitationData);
+
+    // Email template
+    const emailContent = {
+      to: invitationData.email,
+      subject: `You're invited to collaborate on "${invitationData.list}"`,
+      html: generateEmailTemplate(invitationData, invitationLink),
+      text: generateTextTemplate(invitationData, invitationLink),
+    };
+
+    // Try backend API first
+    try {
+      return await sendWithBackendAPI(emailContent);
+    } catch (backendError) {
+      console.error("Backend email failed:", backendError);
+
+      // If backend fails, try EmailJS as fallback
+      if (process.env.REACT_APP_EMAILJS_SERVICE_ID) {
+        console.log("Falling back to EmailJS...");
+        return await sendWithEmailJS(emailContent, invitationData);
+      }
+
+      // If both fail, throw the backend error
+      throw backendError;
+    }
+  } catch (error) {
+    console.error("Failed to send invitation email:", error);
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
 };
 
 /**
@@ -35,61 +89,19 @@ const generateInvitationLink = (invitationData) => {
 };
 
 /**
- * Send invitation email
- * @param {Object} invitationData - Invitation details
- * @param {string} invitationData.email - Recipient email
- * @param {string} invitationData.listName - List name
- * @param {string} invitationData.invitedByName - Inviter name
- * @param {string} invitationData.role - User role
- * @param {string} invitationData.listId - List ID
- * @returns {Promise<Object>} Email sending result
- */
-export const sendInvitationEmail = async (invitationData) => {
-  if (!isEmailServiceAvailable()) {
-    throw new Error("Email service is not configured");
-  }
-
-  try {
-    const invitationLink = generateInvitationLink(invitationData);
-
-    // Email template
-    const emailContent = {
-      to: invitationData.email,
-      subject: `You're invited to collaborate on "${invitationData.listName}"`,
-      html: generateEmailTemplate(invitationData, invitationLink),
-      text: generateTextTemplate(invitationData, invitationLink),
-    };
-
-    // Here you would integrate with your preferred email service
-    // Examples: EmailJS, SendGrid, Nodemailer, etc.
-
-    // Option 1: EmailJS (Frontend email service)
-    if (process.env.REACT_APP_EMAILJS_SERVICE_ID) {
-      return await sendWithEmailJS(emailContent, invitationData);
-    }
-
-    // Option 2: Your backend API
-    return await sendWithBackendAPI(emailContent);
-  } catch (error) {
-    console.error("Failed to send invitation email:", error);
-    throw new Error(`Failed to send email: ${error.message}`);
-  }
-};
-
-/**
  * Share invitation link using native sharing or clipboard
  * @param {Object} invitationData - Invitation details
  * @returns {Promise<Object>} Sharing result
  */
 export const shareInvitationLink = async (invitationData) => {
   const invitationLink = generateInvitationLink(invitationData);
-  const shareText = `${invitationData.invitedByName} invited you to collaborate on "${invitationData.listName}"`;
+  const shareText = `${invitationData.invitedByName} invited you to collaborate on "${invitationData.list}"`;
 
   try {
-    // Try native Web Share API first (mobile/modern browsers)
+    // Try native Web Share API first
     if (navigator.share && navigator.canShare) {
       const shareData = {
-        title: `Invitation to "${invitationData.listName}"`,
+        title: `Invitation to "${invitationData.list}"`,
         text: shareText,
         url: invitationLink,
       };
@@ -100,6 +112,7 @@ export const shareInvitationLink = async (invitationData) => {
           success: true,
           method: "native-share",
           url: invitationLink,
+          message: "Invitation shared successfully!",
         };
       }
     }
@@ -110,31 +123,29 @@ export const shareInvitationLink = async (invitationData) => {
       success: true,
       method: "clipboard",
       url: invitationLink,
+      message: "Invitation link copied to clipboard!",
     };
   } catch (error) {
     console.error("Failed to share invitation link:", error);
 
-    // Ultimate fallback - just return the link
     return {
       success: false,
       method: "manual",
       url: invitationLink,
       error: error.message,
+      message: "Please copy the link manually.",
     };
   }
 };
 
 /**
- * Send email using EmailJS (client-side email service)
+ * Send email using EmailJS (fallback)
  * @param {Object} emailContent - Email content
  * @param {Object} invitationData - Invitation data
  * @returns {Promise<Object>} EmailJS result
  */
 const sendWithEmailJS = async (emailContent, invitationData) => {
-  // You'll need to install emailjs: npm install @emailjs/browser
-  // Import: import emailjs from '@emailjs/browser';
-
-  const emailjs = window.emailjs; // If loaded via CDN
+  const emailjs = window.emailjs;
 
   if (!emailjs) {
     throw new Error("EmailJS not loaded");
@@ -144,10 +155,10 @@ const sendWithEmailJS = async (emailContent, invitationData) => {
     to_email: invitationData.email,
     to_name: invitationData.email.split("@")[0],
     from_name: invitationData.invitedByName,
-    list_name: invitationData.listName,
+    list_name: invitationData.list,
     role: invitationData.role,
     invitation_link: generateInvitationLink(invitationData),
-    message: `You've been invited to collaborate on the list "${invitationData.listName}" as a ${invitationData.role}.`,
+    message: `You've been invited to collaborate on the list "${invitationData.list}" as a ${invitationData.role}.`,
   };
 
   const result = await emailjs.send(
@@ -158,30 +169,6 @@ const sendWithEmailJS = async (emailContent, invitationData) => {
   );
 
   return { success: true, service: "emailjs", result };
-};
-
-/**
- * Send email through backend API
- * @param {Object} emailContent - Email content
- * @returns {Promise<Object>} Backend API result
- */
-const sendWithBackendAPI = async (emailContent) => {
-  const response = await fetch("/api/email/send-invitation", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify(emailContent),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to send email");
-  }
-
-  const result = await response.json();
-  return { success: true, service: "backend", result };
 };
 
 /**
@@ -199,56 +186,38 @@ const generateEmailTemplate = (invitationData, invitationLink) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>You're invited to collaborate</title>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #1976d2; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; background: #1976d2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-            .role-badge { background: #e3f2fd; color: #1976d2; padding: 4px 12px; border-radius: 16px; font-size: 14px; }
+            .header { background: #1976d2; color: white; padding: 20px; text-align: center; }
+            .content { background: #f9f9f9; padding: 30px; }
+            .button { display: inline-block; background: #1976d2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; }
             .footer { text-align: center; color: #666; font-size: 14px; margin-top: 30px; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎯 You're invited to collaborate!</h1>
+                <h1>You're invited to collaborate!</h1>
             </div>
             <div class="content">
                 <p>Hi there!</p>
                 
-                <p><strong>${
-                  invitationData.invitedByName
-                }</strong> has invited you to collaborate on the list:</p>
+                <p><strong>${invitationData.invitedByName}</strong> has invited you to collaborate on:</p>
                 
-                <h2>"${invitationData.listName}"</h2>
+                <h2>"${invitationData.list}"</h2>
                 
-                <p>You've been invited as a <span class="role-badge">${
-                  invitationData.role
-                }</span></p>
-                
-                <p>Click the button below to accept the invitation and start collaborating:</p>
+                <p>Role: <strong>${invitationData.role}</strong></p>
                 
                 <p style="text-align: center;">
                     <a href="${invitationLink}" class="button">Accept Invitation</a>
                 </p>
                 
-                <p><small>If the button doesn't work, copy and paste this link in your browser:<br>
-                <a href="${invitationLink}">${invitationLink}</a></small></p>
+                <p>Or copy this link: ${invitationLink}</p>
                 
-                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
-                
-                <p><strong>Role Permissions:</strong></p>
-                <ul>
-                    ${getRolePermissionsHTML(invitationData.role)}
-                </ul>
-                
-                <p><em>This invitation will expire in 7 days.</em></p>
+                <p><em>This invitation expires in 7 days.</em></p>
             </div>
             <div class="footer">
-                <p>You received this email because ${
-                  invitationData.invitedByName
-                } invited you to collaborate.<br>
-                If you don't want to receive these emails, you can ignore this invitation.</p>
+                <p>Collaborative Todo App</p>
             </div>
         </div>
     </body>
@@ -266,61 +235,14 @@ const generateTextTemplate = (invitationData, invitationLink) => {
   return `
 You're invited to collaborate!
 
-${invitationData.invitedByName} has invited you to collaborate on the list "${
-    invitationData.listName
-  }".
+${invitationData.invitedByName} has invited you to collaborate on "${invitationData.list}".
 
-You've been invited as a ${invitationData.role}.
+Role: ${invitationData.role}
 
-Accept your invitation by visiting this link:
-${invitationLink}
+Accept your invitation: ${invitationLink}
 
-Role Permissions:
-${getRolePermissionsText(invitationData.role)}
-
-This invitation will expire in 7 days.
-
-You received this email because ${
-    invitationData.invitedByName
-  } invited you to collaborate.
-If you don't want to receive these emails, you can ignore this invitation.
+This invitation expires in 7 days.
   `.trim();
-};
-
-/**
- * Get role permissions as HTML
- * @param {string} role - User role
- * @returns {string} HTML list items
- */
-const getRolePermissionsHTML = (role) => {
-  switch (role) {
-    case "viewer":
-      return "<li>View tasks and activity</li><li>Cannot make changes</li>";
-    case "editor":
-      return "<li>View tasks and activity</li><li>Create, edit, and delete tasks</li><li>Cannot manage members</li>";
-    case "owner":
-      return "<li>Full control over the list</li><li>Manage members and permissions</li><li>Can delete the list</li>";
-    default:
-      return "<li>Basic permissions</li>";
-  }
-};
-
-/**
- * Get role permissions as plain text
- * @param {string} role - User role
- * @returns {string} Plain text permissions
- */
-const getRolePermissionsText = (role) => {
-  switch (role) {
-    case "viewer":
-      return "- View tasks and activity\n- Cannot make changes";
-    case "editor":
-      return "- View tasks and activity\n- Create, edit, and delete tasks\n- Cannot manage members";
-    case "owner":
-      return "- Full control over the list\n- Manage members and permissions\n- Can delete the list";
-    default:
-      return "- Basic permissions";
-  }
 };
 
 /**
@@ -333,7 +255,6 @@ export const validateEmail = (email) => {
   return emailRegex.test(email);
 };
 
-// Default export for backward compatibility
 export default {
   isEmailServiceAvailable,
   sendInvitationEmail,

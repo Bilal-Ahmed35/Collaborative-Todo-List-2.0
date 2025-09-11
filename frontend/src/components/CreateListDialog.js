@@ -16,13 +16,13 @@ export default function CreateListDialog({
   createList,
   showSnackbar,
 }) {
-  const [listName, setListName] = useState("");
+  const [list, setlist] = useState("");
   const [listDescription, setListDescription] = useState("");
   const [listDueDate, setListDueDate] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleCreateList = async () => {
-    if (!listName.trim()) {
+    if (!list.trim()) {
       showSnackbar("List name is required", "error");
       return;
     }
@@ -34,7 +34,7 @@ export default function CreateListDialog({
     setLoading(true);
     try {
       const listData = {
-        name: listName.trim(),
+        name: list.trim(),
         description: listDescription.trim(),
         dueDate: listDueDate,
       };
@@ -79,7 +79,7 @@ export default function CreateListDialog({
   };
 
   const handleClose = () => {
-    setListName("");
+    setlist("");
     setListDescription("");
     setListDueDate("");
     setCreateListOpen(false);
@@ -87,7 +87,7 @@ export default function CreateListDialog({
 
   // Enhanced validation
   const isFormValid = () => {
-    return listName.trim().length > 0 && listDueDate && !loading;
+    return list.trim().length > 0 && listDueDate && !loading;
   };
 
   return (
@@ -98,13 +98,13 @@ export default function CreateListDialog({
       >
         <TextField
           label="List Name *"
-          value={listName}
-          onChange={(e) => setListName(e.target.value)}
+          value={list}
+          onChange={(e) => setlist(e.target.value)}
           fullWidth
           required
-          error={!listName.trim() && listName.length > 0}
+          error={!list.trim() && list.length > 0}
           helperText={
-            !listName.trim() && listName.length > 0
+            !list.trim() && list.length > 0
               ? "List name is required"
               : ""
           }

@@ -93,7 +93,7 @@ export default function InviteDialog({
       // Send notification based on method
       const invitationData = {
         email: inviteEmail.trim(),
-        listName: currentList?.name || "Untitled List",
+        list: currentList?.name || "Untitled List",
         invitedByName: user?.displayName || user?.email || "Someone",
         role: inviteRole,
         listId: activeListId,
@@ -334,14 +334,20 @@ export default function InviteDialog({
                   >
                     Share Link
                   </Button>
-                  <Tooltip title="Copy invitation link">
-                    <IconButton
-                      size="small"
-                      onClick={copyInviteLink}
-                      disabled={loading || !isValidEmail}
-                    >
-                      <CopyIcon />
-                    </IconButton>
+                  <Tooltip
+                    title={
+                      loading || !isValidEmail ? "" : "Copy invitation link"
+                    }
+                  >
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={copyInviteLink}
+                        disabled={loading || !isValidEmail}
+                      >
+                        <CopyIcon />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </Box>
               ) : (

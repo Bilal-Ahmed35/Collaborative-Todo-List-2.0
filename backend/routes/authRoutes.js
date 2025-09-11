@@ -200,23 +200,23 @@ router.post("/google", checkDatabaseConnection, async (req, res) => {
             const notification = new Notification({
               userId: userData.uid,
               title: "List Invitation Accepted",
-              message: `You've been added to "${invite.listName}" as ${invite.role}`,
+              message: `You've been added to "${invite.list}" as ${invite.role}`,
               listId: invite.listId,
               type: "welcome",
             });
             await notification.save();
 
             await PendingInvitation.findByIdAndDelete(invite._id);
-            console.log("✅ Processed invitation for list:", invite.listName);
-            return { success: true, listName: invite.listName };
+            console.log("✅ Processed invitation for list:", invite.list);
+            return { success: true, list: invite.list };
           } catch (inviteError) {
             console.error(
-              `❌ Error processing invitation for ${invite.listName}:`,
+              `❌ Error processing invitation for ${invite.list}:`,
               inviteError.message
             );
             return {
               success: false,
-              listName: invite.listName,
+              list: invite.list,
               error: inviteError.message,
             };
           }

@@ -132,87 +132,89 @@ export default function LoginScreen() {
             </Typography>
 
             <Alert severity="error" sx={{ mt: 2, textAlign: "left" }}>
-              <Typography variant="h6" gutterBottom>
-                Google OAuth Configuration Required
-              </Typography>
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Google OAuth Configuration Required
+                </Typography>
 
-              <Typography variant="body2" paragraph>
-                To use this application, you need to set up Google OAuth:
-              </Typography>
+                <Typography variant="body2" gutterBottom>
+                  To use this application, you need to set up Google OAuth:
+                </Typography>
 
-              <Typography variant="body2" component="div">
-                <strong>Step 1:</strong> Install the Google OAuth package:
-                <br />
-                <code
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.1)",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  npm install @react-oauth/google
-                </code>
-              </Typography>
-
-              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
-                <strong>Step 2:</strong> Get a Google Client ID:
-                <br />
-                1. Go to{" "}
-                <a
-                  href="https://console.cloud.google.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "inherit" }}
-                >
-                  Google Cloud Console
-                </a>
-                <br />
-                2. Create a new project or select existing
-                <br />
-                3. Enable Google+ API
-                <br />
-                4. Create OAuth 2.0 credentials
-                <br />
-                5. Add http://localhost:3000 to authorized origins
-              </Typography>
-
-              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
-                <strong>Step 3:</strong> Add to your frontend .env file:
-                <br />
-                <code
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.1)",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  REACT_APP_GOOGLE_CLIENT_ID=your_client_id_here
-                </code>
-              </Typography>
-
-              <Typography variant="body2" component="div" sx={{ mt: 2 }}>
-                <strong>Step 4:</strong> Add to your backend .env file:
-                <br />
-                <code
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.1)",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  GOOGLE_CLIENT_ID=your_client_id_here
+                <Typography variant="body2" component="div">
+                  <strong>Step 1:</strong> Install the Google OAuth package:
                   <br />
-                  GOOGLE_CLIENT_SECRET=your_client_secret_here
-                </code>
-              </Typography>
+                  <code
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.1)",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    npm install @react-oauth/google
+                  </code>
+                </Typography>
 
-              <Typography variant="body2" sx={{ mt: 2 }}>
-                <strong>Step 5:</strong> Restart both frontend and backend
-                servers
-              </Typography>
+                <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                  <strong>Step 2:</strong> Get a Google Client ID:
+                  <br />
+                  1. Go to{" "}
+                  <a
+                    href="https://console.cloud.google.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit" }}
+                  >
+                    Google Cloud Console
+                  </a>
+                  <br />
+                  2. Create a new project or select existing
+                  <br />
+                  3. Enable Google+ API
+                  <br />
+                  4. Create OAuth 2.0 credentials
+                  <br />
+                  5. Add http://localhost:3000 to authorized origins
+                </Typography>
+
+                <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                  <strong>Step 3:</strong> Add to your frontend .env file:
+                  <br />
+                  <code
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.1)",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    REACT_APP_GOOGLE_CLIENT_ID=your_client_id_here
+                  </code>
+                </Typography>
+
+                <Typography variant="body2" component="div" sx={{ mt: 2 }}>
+                  <strong>Step 4:</strong> Add to your backend .env file:
+                  <br />
+                  <code
+                    style={{
+                      backgroundColor: "rgba(0,0,0,0.1)",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    GOOGLE_CLIENT_ID=your_client_id_here
+                    <br />
+                    GOOGLE_CLIENT_SECRET=your_client_secret_here
+                  </code>
+                </Typography>
+
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  <strong>Step 5:</strong> Restart both frontend and backend
+                  servers
+                </Typography>
+              </Box>
             </Alert>
 
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -246,11 +248,11 @@ export default function LoginScreen() {
               Collab Todo
             </Typography>
 
-            <Typography variant="body1" color="text.secondary" paragraph>
+            <Typography variant="body1" color="text.secondary" gutterBottom>
               Collaborate on tasks with your team in real-time
             </Typography>
 
-            <Typography variant="caption" color="text.secondary" paragraph>
+            <Typography variant="caption" color="text.secondary" gutterBottom>
               Powered by MongoDB Atlas for better performance and scalability
             </Typography>
 
@@ -259,38 +261,40 @@ export default function LoginScreen() {
 
             {error && (
               <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
-                <Typography variant="body2">{error}</Typography>
-                {serverStatus === "disconnected" && (
-                  <>
-                    <Typography
-                      variant="caption"
-                      sx={{ display: "block", mt: 1 }}
-                    >
-                      To start the backend server:
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      component="code"
-                      sx={{
-                        display: "block",
-                        mt: 0.5,
-                        fontFamily: "monospace",
-                        backgroundColor: "rgba(0,0,0,0.1)",
-                        p: 0.5,
-                        borderRadius: 1,
-                      }}
-                    >
-                      cd backend && npm run server
-                    </Typography>
-                    <Button
-                      size="small"
-                      onClick={checkServerConnection}
-                      sx={{ mt: 1 }}
-                    >
-                      Check Again
-                    </Button>
-                  </>
-                )}
+                <Box>
+                  <Typography variant="body2">{error}</Typography>
+                  {serverStatus === "disconnected" && (
+                    <>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: "block", mt: 1 }}
+                      >
+                        To start the backend server:
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        component="code"
+                        sx={{
+                          display: "block",
+                          mt: 0.5,
+                          fontFamily: "monospace",
+                          backgroundColor: "rgba(0,0,0,0.1)",
+                          p: 0.5,
+                          borderRadius: 1,
+                        }}
+                      >
+                        cd backend && npm run server
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={checkServerConnection}
+                        sx={{ mt: 1 }}
+                      >
+                        Check Again
+                      </Button>
+                    </>
+                  )}
+                </Box>
               </Alert>
             )}
 
@@ -329,16 +333,18 @@ export default function LoginScreen() {
 
             {/* Development Instructions */}
             <Alert severity="info" sx={{ mt: 3, textAlign: "left" }}>
-              <Typography variant="body2" fontWeight="bold" gutterBottom>
-                Development Setup:
-              </Typography>
-              <Typography variant="body2" component="div">
-                1. Start backend: <code>cd backend && npm run server</code>
-                <br />
-                2. Start frontend: <code>cd frontend && npm start</code>
-                <br />
-                3. Sign in with your Google account
-              </Typography>
+              <Box>
+                <Typography variant="body2" fontWeight="bold" gutterBottom>
+                  Development Setup:
+                </Typography>
+                <Typography variant="body2" component="div">
+                  1. Start backend: <code>cd backend && npm run server</code>
+                  <br />
+                  2. Start frontend: <code>cd frontend && npm start</code>
+                  <br />
+                  3. Sign in with your Google account
+                </Typography>
+              </Box>
             </Alert>
           </CardContent>
         </Card>

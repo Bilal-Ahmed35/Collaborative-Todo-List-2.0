@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 
+const emailRoutes = require("./routes/emailRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const listRoutes = require("./routes/listRoutes");
@@ -156,6 +157,7 @@ app.set("io", io);
 
 // Register routes BEFORE attempting DB connection
 app.use("/api/auth", authRoutes);
+app.use("/api/email", authenticateToken, emailRoutes); // Add this line
 app.use("/api/users", authenticateToken, userRoutes);
 app.use("/api/lists", authenticateToken, listRoutes);
 app.use("/api/tasks", authenticateToken, taskRoutes);
