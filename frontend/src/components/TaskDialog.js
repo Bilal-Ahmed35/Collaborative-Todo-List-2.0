@@ -1,225 +1,429 @@
-import React from "react";
+// import React, { useState, useEffect } from "react";
+// import {
+//   Dialog,
+//   DialogTitle,
+//   DialogContent,
+//   DialogActions,
+//   TextField,
+//   Button,
+//   FormControl,
+//   InputLabel,
+//   Select,
+//   MenuItem,
+//   Box,
+//   Typography,
+// } from "@mui/material";
+
+// export default function TaskDialog({
+//   taskDialogOpen,
+//   setTaskDialogOpen,
+//   editingTask,
+//   setEditingTask,
+//   activeListId,
+//   createTask,
+//   updateTask,
+//   members,
+//   currentList,
+//   showSnackbar,
+// }) {
+//   const [title, setTitle] = useState("");
+//   const [description, setDescription] = useState("");
+//   const [priority, setPriority] = useState("Medium");
+//   const [status, setStatus] = useState("Pending");
+//   const [deadline, setDeadline] = useState("");
+//   const [assignedToUid, setAssignedToUid] = useState("");
+//   const [loading, setLoading] = useState(false);
+
+//   // Populate form when editing
+//   useEffect(() => {
+//     if (editingTask) {
+//       setTitle(editingTask.title || "");
+//       setDescription(editingTask.description || "");
+//       setPriority(editingTask.priority || "Medium");
+//       setStatus(editingTask.status || "Pending");
+//       setDeadline(
+//         editingTask.deadline ? editingTask.deadline.split("T")[0] : ""
+//       );
+//       setAssignedToUid(editingTask.assignedToUid || "");
+//     } else {
+//       // Clear form for new task
+//       setTitle("");
+//       setDescription("");
+//       setPriority("Medium");
+//       setStatus("Pending");
+//       setDeadline("");
+//       setAssignedToUid("");
+//     }
+//   }, [editingTask]);
+
+//   const handleSubmit = async () => {
+//     if (!title.trim()) {
+//       showSnackbar("Task title is required", "error");
+//       return;
+//     }
+
+//     setLoading(true);
+//     try {
+//       const taskData = {
+//         title: title.trim(),
+//         description: description.trim(),
+//         priority,
+//         status,
+//         deadline: deadline || null,
+//         assignedToUid: assignedToUid || null,
+//         done: false,
+//       };
+
+//       if (editingTask) {
+//         // Update existing task
+//         await updateTask(activeListId, editingTask._id, taskData);
+//         showSnackbar("Task updated successfully", "success");
+//       } else {
+//         // Create new task
+//         await createTask(activeListId, taskData);
+//         showSnackbar("Task created successfully", "success");
+//       }
+
+//       handleClose();
+//     } catch (error) {
+//       console.error("Error saving task:", error);
+//       showSnackbar("Failed to save task", "error");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleClose = () => {
+//     setTitle("");
+//     setDescription("");
+//     setPriority("Medium");
+//     setStatus("todo");
+//     setDeadline("");
+//     setAssignedToUid("");
+//     setEditingTask(null);
+//     setTaskDialogOpen(false);
+//   };
+
+//   const availableMembers = members.filter((member) =>
+//     currentList?.memberIds?.includes(member.uid)
+//   );
+
+//   return (
+//     <Dialog open={taskDialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+//       <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
+//       <DialogContent
+//         sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}
+//       >
+//         <TextField
+//           label="Task Title *"
+//           value={title}
+//           onChange={(e) => setTitle(e.target.value)}
+//           fullWidth
+//           required
+//           disabled={loading}
+//           autoFocus
+//         />
+
+//         <TextField
+//           label="Description"
+//           value={description}
+//           onChange={(e) => setDescription(e.target.value)}
+//           multiline
+//           rows={3}
+//           fullWidth
+//           disabled={loading}
+//         />
+
+//         <Box sx={{ display: "flex", gap: 2 }}>
+//           <FormControl fullWidth>
+//             <InputLabel>Priority</InputLabel>
+//             <Select
+//               value={priority}
+//               label="Priority"
+//               onChange={(e) => setPriority(e.target.value)}
+//               disabled={loading}
+//             >
+//               <MenuItem value="Low">Low</MenuItem>
+//               <MenuItem value="Medium">Medium</MenuItem>
+//               <MenuItem value="High">High</MenuItem>
+//             </Select>
+//           </FormControl>
+
+//           <FormControl fullWidth>
+//             <InputLabel>Status</InputLabel>
+//             <Select
+//               value={status}
+//               label="Status"
+//               onChange={(e) => setStatus(e.target.value)}
+//               disabled={loading}
+//             >
+//               <MenuItem value="Pending">Pending</MenuItem>
+//               <MenuItem value="InProgress">In Progress</MenuItem>
+//               <MenuItem value="Completed">Completed</MenuItem>
+//             </Select>
+//           </FormControl>
+//         </Box>
+
+//         <TextField
+//           label="Deadline"
+//           type="date"
+//           value={deadline}
+//           onChange={(e) => setDeadline(e.target.value)}
+//           fullWidth
+//           InputLabelProps={{ shrink: true }}
+//           disabled={loading}
+//           inputProps={{
+//             min: new Date().toISOString().split("T")[0], // Prevent past dates
+//           }}
+//         />
+
+//         <FormControl fullWidth>
+//           <InputLabel>Assign To</InputLabel>
+//           <Select
+//             value={assignedToUid}
+//             label="Assign To"
+//             onChange={(e) => setAssignedToUid(e.target.value)}
+//             disabled={loading}
+//           >
+//             <MenuItem value="">Unassigned</MenuItem>
+//             {availableMembers.map((member) => (
+//               <MenuItem key={member.uid} value={member.uid}>
+//                 {member.displayName || member.email}
+//               </MenuItem>
+//             ))}
+//           </Select>
+//         </FormControl>
+//       </DialogContent>
+
+//       <DialogActions>
+//         <Button onClick={handleClose} disabled={loading}>
+//           Cancel
+//         </Button>
+//         <Button
+//           variant="contained"
+//           onClick={handleSubmit}
+//           disabled={!title.trim() || loading}
+//         >
+//           {loading ? "Saving..." : editingTask ? "Update Task" : "Create Task"}
+//         </Button>
+//       </DialogActions>
+//     </Dialog>
+//   );
+// }
+
+import React, { useState, useEffect } from "react";
 import {
-  List,
-  ListItem,
-  Box,
-  IconButton,
-  Checkbox,
-  Typography,
-  Stack,
-  Chip,
-  Avatar,
-  Card,
-  CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
   Button,
-  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Box,
+  Typography,
 } from "@mui/material";
-import {
-  DragIndicator as DragIndicatorIcon,
-  Comment as CommentIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Flag as FlagIcon,
-  AccessTime as AccessTimeIcon,
-  Add as AddIcon,
-  Lock as LockIcon,
-} from "@mui/icons-material";
-import {
-  getPriorityColor,
-  getStatusColor,
-  formatDate,
-  isOverdue,
-  getMemberName,
-} from "../utils/helpers";
 
-export default function TaskList({
-  filteredTasks,
-  currentTasks,
+export default function TaskDialog({
+  taskDialogOpen,
+  setTaskDialogOpen,
+  editingTask,
+  setEditingTask,
+  activeListId,
+  createTask,
+  updateTask,
   members,
-  toggleTaskDone,
-  deleteTask,
-  openTaskDialog,
-  canEdit,
-  userRole,
+  currentList,
+  showSnackbar,
 }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [status, setStatus] = useState("Pending");
+  const [deadline, setDeadline] = useState("");
+  const [assignedToUid, setAssignedToUid] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingTask) {
+      setTitle(editingTask.title || "");
+      setDescription(editingTask.description || "");
+      setPriority(editingTask.priority || "Medium");
+      setStatus(editingTask.status || "Pending");
+      setDeadline(
+        editingTask.deadline ? editingTask.deadline.split("T")[0] : ""
+      );
+      setAssignedToUid(editingTask.assignedToUid || "");
+    } else {
+      // Clear form for new task
+      setTitle("");
+      setDescription("");
+      setPriority("Medium");
+      setStatus("Pending");
+      setDeadline("");
+      setAssignedToUid("");
+    }
+  }, [editingTask]);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      showSnackbar("Task title is required", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const taskData = {
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        status,
+        deadline: deadline || null,
+        assignedToUid: assignedToUid || null,
+        done: false,
+      };
+
+      // Debug logging to see what we're sending
+      console.log("Sending task data:", taskData);
+      console.log("Status value being sent:", status);
+
+      if (editingTask) {
+        // Update existing task
+        await updateTask(activeListId, editingTask._id, taskData);
+        showSnackbar("Task updated successfully", "success");
+      } else {
+        // Create new task
+        await createTask(activeListId, taskData);
+        showSnackbar("Task created successfully", "success");
+      }
+
+      handleClose();
+    } catch (error) {
+      console.error("Error saving task:", error);
+      showSnackbar("Failed to save task", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setTitle("");
+    setDescription("");
+    setPriority("Medium");
+    setStatus("todo");
+    setDeadline("");
+    setAssignedToUid("");
+    setEditingTask(null);
+    setTaskDialogOpen(false);
+  };
+
+  const availableMembers = members.filter((member) =>
+    currentList?.memberIds?.includes(member.uid)
+  );
+
   return (
-    <List>
-      {filteredTasks.map((task) => (
-        <ListItem
-          key={task.id}
-          sx={{
-            mb: 1,
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 2,
-            bgcolor: "background.paper",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              width: "100%",
-              alignItems: "center",
-            }}
-          >
-            {/* Drag Handle - Only show if user can edit */}
-            {canEdit && (
-              <IconButton size="small" sx={{ mr: 1, cursor: "grab" }}>
-                <DragIndicatorIcon color="action" />
-              </IconButton>
-            )}
+    <Dialog open={taskDialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle>{editingTask ? "Edit Task" : "Create New Task"}</DialogTitle>
+      <DialogContent
+        sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}
+      >
+        <TextField
+          label="Task Title *"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          fullWidth
+          required
+          disabled={loading}
+          autoFocus
+        />
 
-            {/* Task Completion Checkbox */}
-            <Tooltip
-              title={
-                canEdit
-                  ? task.done
-                    ? "Mark as incomplete"
-                    : "Mark as complete"
-                  : "View-only access"
-              }
+        <TextField
+          label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          multiline
+          rows={3}
+          fullWidth
+          disabled={loading}
+        />
+
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <FormControl fullWidth>
+            <InputLabel>Priority</InputLabel>
+            <Select
+              value={priority}
+              label="Priority"
+              onChange={(e) => setPriority(e.target.value)}
+              disabled={loading}
             >
-              <Checkbox
-                checked={task.done}
-                onChange={() => toggleTaskDone(task.id)}
-                disabled={!canEdit}
-              />
-            </Tooltip>
+              <MenuItem value="Low">Low</MenuItem>
+              <MenuItem value="Medium">Medium</MenuItem>
+              <MenuItem value="High">High</MenuItem>
+            </Select>
+          </FormControl>
 
-            <Box sx={{ flexGrow: 1, ml: 1 }}>
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  textDecoration: task.done ? "line-through" : "none",
-                  opacity: task.done ? 0.6 : 1,
-                }}
-              >
-                {task.title}
-              </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={status}
+              label="Status"
+              onChange={(e) => setStatus(e.target.value)}
+              disabled={loading}
+            >
+              <MenuItem value="Pending">Pending</MenuItem>
+              <MenuItem value="InProgress">In Progress</MenuItem>
+              <MenuItem value="Completed">Completed</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
 
-              {task.description && (
-                <Typography variant="body2" color="text.secondary">
-                  {task.description}
-                </Typography>
-              )}
+        <TextField
+          label="Deadline"
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          fullWidth
+          InputLabelProps={{ shrink: true }}
+          disabled={loading}
+          inputProps={{
+            min: new Date().toISOString().split("T")[0], // Prevent past dates
+          }}
+        />
 
-              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                <Chip
-                  label={task.priority}
-                  size="small"
-                  color={getPriorityColor(task.priority)}
-                  icon={<FlagIcon />}
-                />
-                <Chip
-                  label={task.status}
-                  size="small"
-                  color={getStatusColor(task.status)}
-                />
-                {task.deadline && (
-                  <Chip
-                    label={formatDate(task.deadline)}
-                    size="small"
-                    color={
-                      isOverdue(task.deadline) && !task.done
-                        ? "error"
-                        : "default"
-                    }
-                    icon={<AccessTimeIcon />}
-                  />
-                )}
-                {task.assignedToUid && (
-                  <Chip
-                    label={getMemberName(task.assignedToUid, members)}
-                    size="small"
-                    avatar={
-                      <Avatar
-                        src={
-                          members.find((m) => m.uid === task.assignedToUid)
-                            ?.photoURL
-                        }
-                        sx={{ width: 20, height: 20 }}
-                      />
-                    }
-                  />
-                )}
-              </Stack>
-            </Box>
+        <FormControl fullWidth>
+          <InputLabel>Assign To</InputLabel>
+          <Select
+            value={assignedToUid}
+            label="Assign To"
+            onChange={(e) => setAssignedToUid(e.target.value)}
+            disabled={loading}
+          >
+            <MenuItem value="">Unassigned</MenuItem>
+            {availableMembers.map((member) => (
+              <MenuItem key={member.uid} value={member.uid}>
+                {member.displayName || member.email}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </DialogContent>
 
-            {/* Action Buttons */}
-            <Stack direction="row" spacing={1}>
-              <Tooltip title="Comments (Coming soon)">
-                <IconButton size="small" disabled>
-                  <CommentIcon />
-                </IconButton>
-              </Tooltip>
-
-              {canEdit ? (
-                <Tooltip title="Edit task">
-                  <IconButton size="small" onClick={() => openTaskDialog(task)}>
-                    <EditIcon />
-                  </IconButton>
-                </Tooltip>
-              ) : (
-                <Tooltip title="View-only access">
-                  <IconButton size="small" disabled>
-                    <LockIcon />
-                  </IconButton>
-                </Tooltip>
-              )}
-
-              {canEdit ? (
-                <Tooltip title="Delete task">
-                  <IconButton
-                    size="small"
-                    onClick={() => deleteTask(task.id, task.title)}
-                    color="error"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-              ) : (
-                <Tooltip title="View-only access">
-                  <IconButton size="small" disabled>
-                    <LockIcon />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Stack>
-          </Box>
-        </ListItem>
-      ))}
-
-      {/* Empty State */}
-      {filteredTasks.length === 0 && (
-        <Card sx={{ textAlign: "center", py: 4 }}>
-          <CardContent>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              No tasks found
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              {currentTasks.length === 0
-                ? canEdit
-                  ? "Create your first task to get started!"
-                  : "No tasks have been created yet."
-                : "Try adjusting your filters or search terms."}
-            </Typography>
-            {currentTasks.length === 0 && canEdit && (
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => openTaskDialog()}
-              >
-                Create First Task
-              </Button>
-            )}
-            {currentTasks.length === 0 && !canEdit && (
-              <Typography variant="body2" color="text.secondary">
-                You have {userRole} access to this list.
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </List>
+      <DialogActions>
+        <Button onClick={handleClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={!title.trim() || loading}
+        >
+          {loading ? "Saving..." : editingTask ? "Update Task" : "Create Task"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

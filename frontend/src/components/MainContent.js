@@ -198,14 +198,16 @@ export default function MainContent({
                   </Button>
                 ) : (
                   <Tooltip title="View-only access - cannot create tasks">
-                    <Button
-                      variant="outlined"
-                      startIcon={<LockIcon />}
-                      disabled
-                      sx={{ ml: 2 }}
-                    >
-                      View Only
-                    </Button>
+                    <span style={{ display: "inline-block" }}>
+                      <Button
+                        variant="outlined"
+                        startIcon={<LockIcon />}
+                        disabled
+                        sx={{ ml: 2 }}
+                      >
+                        View Only
+                      </Button>
+                    </span>
                   </Tooltip>
                 )}
 
@@ -221,9 +223,11 @@ export default function MainContent({
                   </Tooltip>
                 ) : (
                   <Tooltip title="Only owners and editors can invite members">
-                    <Button variant="outlined" disabled sx={{ ml: 1 }}>
-                      <LockIcon />
-                    </Button>
+                    <span style={{ display: "inline-block" }}>
+                      <Button variant="outlined" disabled sx={{ ml: 1 }}>
+                        <LockIcon />
+                      </Button>
+                    </span>
                   </Tooltip>
                 )}
               </Box>

@@ -46,7 +46,7 @@ export default function TaskList({
     <List>
       {filteredTasks.map((task) => (
         <ListItem
-          key={task.id}
+          key={task._id} // Fixed: changed from task.id to task._id
           sx={{
             mb: 1,
             border: 1,
@@ -81,7 +81,7 @@ export default function TaskList({
             >
               <Checkbox
                 checked={task.done}
-                onChange={() => toggleTaskDone(task.id)}
+                onChange={() => toggleTaskDone(task._id)} // Fixed: changed from task.id to task._id
                 disabled={!canEdit}
               />
             </Tooltip>
@@ -148,9 +148,11 @@ export default function TaskList({
             {/* Action Buttons */}
             <Stack direction="row" spacing={1}>
               <Tooltip title="Comments (Coming soon)">
-                <IconButton size="small" disabled>
-                  <CommentIcon />
-                </IconButton>
+                <span>
+                  <IconButton size="small" disabled>
+                    <CommentIcon />
+                  </IconButton>
+                </span>
               </Tooltip>
 
               {canEdit ? (
@@ -171,7 +173,7 @@ export default function TaskList({
                 <Tooltip title="Delete task">
                   <IconButton
                     size="small"
-                    onClick={() => deleteTask(task.id, task.title)}
+                    onClick={() => deleteTask(task._id, task.title)} // Fixed: changed from task.id to task._id
                     color="error"
                   >
                     <DeleteIcon />
@@ -207,7 +209,10 @@ export default function TaskList({
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => openTaskDialog()}
+                onClick={() => {
+                  console.log("CREATE FIRST TASK BUTTON CLICKED!");
+                  openTaskDialog();
+                }}
               >
                 Create First Task
               </Button>
