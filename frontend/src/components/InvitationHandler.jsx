@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Tooltip,
 } from "@mui/material";
 import apiService from "../services/apiService";
 
@@ -25,17 +24,6 @@ export default function InvitationHandler({
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [mounted, setMounted] = useState(true);
-
-  // Safe state update helper
-  const safeSetState = useCallback(
-    (setter) => {
-      if (mounted) {
-        setter();
-      }
-    },
-    [mounted]
-  );
 
   // Clear URL parameters helper
   const clearUrlParams = useCallback(() => {
@@ -73,24 +61,18 @@ export default function InvitationHandler({
   );
 
   useEffect(() => {
-    return () => {
-      setMounted(false);
-    };
-  }, []);
-
-  useEffect(() => {
     // Check for invitation parameters in URL
     const urlParams = new URLSearchParams(window.location.search);
     const inviteListId = urlParams.get("invite");
     const inviteEmail = urlParams.get("email");
 
-    if (inviteListId && inviteEmail && user && mounted) {
+    if (inviteListId && inviteEmail && user) {
       handleInviteFromUrl(inviteListId, inviteEmail);
     }
-  }, [user, mounted]);
+  }, [user]);
 
   const handleInviteFromUrl = async (listId, email) => {
-    if (!user || !mounted) return;
+    if (!user) return;
 
     // Validate inputs
     if (!listId || !email) {
@@ -109,13 +91,11 @@ export default function InvitationHandler({
       return;
     }
 
-    safeSetState(() => setLoading(true));
+    setLoading(true);
 
     try {
       // Get invitation data from API
       const invitation = await apiService.getInvitation(listId, email);
-
-      if (!mounted) return;
 
       if (!invitation) {
         showSnackbar(
@@ -138,37 +118,66 @@ export default function InvitationHandler({
       }
 
       // Show invitation dialog
-      if (mounted) {
-        safeSetState(() =>
-          setInviteData({
-            ...invitation,
-            listId,
-            email,
-          })
-        );
-        safeSetState(() => setDialogOpen(true));
-      }
+      setInviteData({
+        ...invitation,
+        listId,
+        email,
+      });
+      setDialogOpen(true);
     } catch (error) {
-      if (!mounted) return;
       handleError(error, "processing invitation");
       clearUrlParams();
     } finally {
-      if (mounted) {
-        safeSetState(() => setLoading(false));
-      }
+      setLoading(false);
     }
   };
 
   const acceptInvitation = async () => {
-    if (!inviteData || !user || !mounted) return;
+    console.log("Accept invitation clicked", {
+      processing,
+      inviteData: !!inviteData,
+      user: !!user,
+    });
 
-    safeSetState(() => setProcessing(true));
+    // Validation check
+    if (!inviteData || !user) {
+      console.error("Cannot accept - missing data:", {
+        inviteData: !!inviteData,
+        user: !!user,
+      });
+
+      if (!user) {
+        showSnackbar("Please sign in first", "error");
+        return;
+      }
+
+      if (!inviteData) {
+        showSnackbar("Invitation data not loaded", "error");
+        return;
+      }
+
+      return;
+    }
+
+    // Prevent double-clicking
+    if (processing) {
+      console.log("Already processing, ignoring click");
+      return;
+    }
+
+    setProcessing(true);
 
     try {
       console.log("Accepting invitation for list:", inviteData.listId);
 
-      // The backend will handle adding the user to the list
-      // when they authenticate and have pending invitations
+      // Call the backend API to accept the invitation
+      await apiService.request(`/invitations/${inviteData.listId}/accept`, {
+        method: "POST",
+        body: JSON.stringify({
+          email: inviteData.email,
+          role: inviteData.role,
+        }),
+      });
 
       showSnackbar(
         `Welcome to "${inviteData.list}"! You now have ${inviteData.role} access.`,
@@ -178,13 +187,11 @@ export default function InvitationHandler({
       // Set the newly joined list as active
       if (setActiveListId) {
         setTimeout(() => {
-          if (mounted) {
-            setActiveListId(inviteData.listId);
-          }
+          setActiveListId(inviteData.listId);
         }, 1000);
       }
 
-      safeSetState(() => setDialogOpen(false));
+      setDialogOpen(false);
       clearUrlParams();
 
       // Refresh the page to reload data with new list access
@@ -192,38 +199,53 @@ export default function InvitationHandler({
         window.location.reload();
       }, 1500);
     } catch (error) {
-      if (!mounted) return;
       console.error("Error accepting invitation:", error);
       handleError(error, "accepting invitation");
     } finally {
-      if (mounted) {
-        safeSetState(() => setProcessing(false));
-      }
+      setProcessing(false);
     }
   };
 
   const declineInvitation = async () => {
-    if (!inviteData || !mounted) return;
+    console.log("Decline invitation clicked", {
+      processing,
+      inviteData: !!inviteData,
+    });
 
-    safeSetState(() => setProcessing(true));
+    if (!inviteData) {
+      console.error("Cannot decline - missing invitation data");
+      return;
+    }
+
+    // Prevent double-clicking
+    if (processing) {
+      console.log("Already processing, ignoring click");
+      return;
+    }
+
+    setProcessing(true);
 
     try {
-      // For now, we'll just close the dialog and clear the URL
-      // In a full implementation, you might want to notify the inviter
-
-      if (!mounted) return;
+      // Call the backend API to decline the invitation
+      await apiService.request(`/invitations/${inviteData.listId}/decline`, {
+        method: "POST",
+        body: JSON.stringify({
+          email: inviteData.email,
+        }),
+      });
 
       showSnackbar("Invitation declined.", "info");
-      safeSetState(() => setDialogOpen(false));
+      setDialogOpen(false);
       clearUrlParams();
     } catch (error) {
-      if (!mounted) return;
       console.error("Error declining invitation:", error);
-      showSnackbar("Failed to decline invitation.", "error");
+
+      // Even if API call fails, still close dialog and clear URL
+      showSnackbar("Invitation declined.", "info");
+      setDialogOpen(false);
+      clearUrlParams();
     } finally {
-      if (mounted) {
-        safeSetState(() => setProcessing(false));
-      }
+      setProcessing(false);
     }
   };
 
@@ -247,35 +269,14 @@ export default function InvitationHandler({
 
   // Handle dialog close
   const handleDialogClose = useCallback(() => {
-    if (!processing && mounted) {
+    console.log("Dialog close requested", { processing });
+    if (!processing) {
       setDialogOpen(false);
       clearUrlParams();
     }
-  }, [processing, mounted, clearUrlParams]);
+  }, [processing, clearUrlParams]);
 
-  // Wrapper component for disabled buttons in tooltips
-  const TooltipButton = ({ tooltip, disabled, children, ...buttonProps }) => {
-    const button = (
-      <Button {...buttonProps} disabled={disabled}>
-        {children}
-      </Button>
-    );
-
-    if (tooltip && disabled) {
-      return (
-        <Tooltip title={tooltip}>
-          <span>{button}</span>
-        </Tooltip>
-      );
-    }
-
-    if (tooltip) {
-      return <Tooltip title={tooltip}>{button}</Tooltip>;
-    }
-
-    return button;
-  };
-
+  // Show loading dialog
   if (loading) {
     return (
       <Dialog open={true} maxWidth="sm" fullWidth disableEscapeKeyDown>
@@ -292,6 +293,7 @@ export default function InvitationHandler({
     );
   }
 
+  // Main invitation dialog
   return (
     <Dialog
       open={dialogOpen}
@@ -304,7 +306,7 @@ export default function InvitationHandler({
         <>
           <DialogTitle>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              🎉 You've been invited!
+              You've been invited!
             </Box>
           </DialogTitle>
           <DialogContent>
@@ -348,21 +350,18 @@ export default function InvitationHandler({
             )}
           </DialogContent>
           <DialogActions>
-            <TooltipButton
+            <Button
               onClick={declineInvitation}
               disabled={processing}
               color="inherit"
-              tooltip={processing ? "Please wait while processing..." : null}
             >
               {processing ? "Processing..." : "Decline"}
-            </TooltipButton>
-            <TooltipButton
+            </Button>
+
+            <Button
               onClick={acceptInvitation}
-              variant="contained"
               disabled={processing}
-              tooltip={
-                processing ? "Please wait while joining the list..." : null
-              }
+              variant="contained"
             >
               {processing ? (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -372,7 +371,7 @@ export default function InvitationHandler({
               ) : (
                 "Accept & Join"
               )}
-            </TooltipButton>
+            </Button>
           </DialogActions>
         </>
       )}

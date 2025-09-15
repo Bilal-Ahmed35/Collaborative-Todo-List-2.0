@@ -5,15 +5,23 @@ const taskSchema = new mongoose.Schema({
   description: String,
   status: {
     type: String,
-    enum: ["todo", "in-progress", "done"],
-    default: "todo",
+    enum: ["Pending", "InProgress", "Completed"], // Fixed to match frontend
+    default: "Pending",
   },
-  dueDate: Date,
+  priority: {
+    type: String,
+    enum: ["Low", "Medium", "High"], // Added missing field
+    default: "Medium",
+  },
+  deadline: Date, // Added field that frontend expects
+  dueDate: Date, // Keep for backward compatibility
   listId: { type: mongoose.Schema.Types.ObjectId, ref: "List", required: true },
-  assigneeId: String, // uid of the assigned user
+  assigneeId: String, // Keep original
+  assignedToUid: String, // Add field that frontend expects
   createdBy: String, // uid of creator
   createdAt: { type: Date, default: Date.now },
   updatedAt: Date,
+  done: { type: Boolean, default: false }, // Added missing field
 });
 
 module.exports = mongoose.model("Task", taskSchema);

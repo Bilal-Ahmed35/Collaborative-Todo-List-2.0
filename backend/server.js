@@ -165,6 +165,80 @@ app.use("/api/activities", authenticateToken, activityRoutes);
 app.use("/api/notifications", authenticateToken, notificationRoutes);
 app.use("/api/invitations", authenticateToken, invitationRoutes);
 
+// Add these debug endpoints to your server.js before the error handling middleware
+
+// Debug endpoint to test invitation creation (both GET and POST)
+app.get("/api/debug/invitation", authenticateToken, async (req, res) => {
+  console.log("🔧 DEBUG - GET Invitation test endpoint hit");
+  console.log("🔧 User:", req.user);
+
+  res.json({
+    message: "Debug GET endpoint working",
+    user: req.user,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.post("/api/debug/invitation", authenticateToken, async (req, res) => {
+  console.log("🔧 DEBUG - Invitation test endpoint hit");
+  console.log("🔧 Request body:", req.body);
+  console.log("🔧 User:", req.user);
+
+  res.json({
+    message: "Debug endpoint working",
+    receivedData: req.body,
+    user: req.user,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Debug endpoint to test list access
+app.get("/api/debug/list/:id", authenticateToken, async (req, res) => {
+  try {
+    const List = require("./models/List");
+    const list = await List.findById(req.params.id);
+
+    console.log("🔧 DEBUG - List access test");
+    console.log("🔧 List found:", !!list);
+    if (list) {
+      console.log("🔧 List name:", list.name);
+      console.log("🔧 Owner:", list.ownerId);
+      console.log("🔧 Members:", list.memberIds);
+      console.log("🔧 Roles:", list.roles);
+      console.log(
+        "🔧 User role:",
+        list.roles instanceof Map
+          ? list.roles.get(req.user.uid)
+          : list.roles[req.user.uid]
+      );
+    }
+
+    res.json({
+      listFound: !!list,
+      listData: list
+        ? {
+            id: list._id,
+            name: list.name,
+            ownerId: list.ownerId,
+            memberIds: list.memberIds,
+            roles:
+              list.roles instanceof Map
+                ? Object.fromEntries(list.roles)
+                : list.roles,
+            userRole:
+              list.roles instanceof Map
+                ? list.roles.get(req.user.uid)
+                : list.roles[req.user.uid],
+          }
+        : null,
+      user: req.user,
+    });
+  } catch (error) {
+    console.error("🔧 DEBUG - Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error("Unhandled error:", error);
